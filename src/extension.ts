@@ -126,15 +126,31 @@ async function runNuScript(context: vscode.ExtensionContext) {
     // Use script's directory as working directory
     const scriptDir = path.dirname(scriptPath);
 
+    // Create environment with extended PATH
+    // VSCode marketplace extensions don't always have Homebrew paths in their PATH
+    const env = { ...process.env } as { [key: string]: string };
+    const additionalPaths = [
+        '/opt/homebrew/bin',  // Homebrew on Apple Silicon
+        '/usr/local/bin',     // Homebrew on Intel Mac
+        '/usr/bin',           // System binaries
+    ];
+
+    // Add additional paths to PATH if they're not already included
+    const currentPath = env.PATH || '';
+    const pathsToAdd = additionalPaths.filter(p => !currentPath.includes(p));
+    if (pathsToAdd.length > 0) {
+        env.PATH = pathsToAdd.join(':') + (currentPath ? ':' + currentPath : '');
+        console.log('Extended PATH:', env.PATH);
+    }
+
     // Create PTY process (real terminal)
-    // Use 'nu' directly and let the system find it via PATH
-    // This is more reliable than trying to find the binary ourselves
+    // Use 'nu' directly and let the system find it via extended PATH
     ptyProcess = pty.spawn('nu', [scriptPath], {
         name: 'xterm-color',
         cols: 80,
         rows: 30,
         cwd: scriptDir,
-        env: process.env as { [key: string]: string }
+        env: env
     });
 
     // Clear previous output and send initial info
