@@ -1,6 +1,6 @@
 {
   "name": "opencode-wrapper",
-  "displayName": "NuShell Interactive Terminal",
+  "displayName": "NuShell Interactive for opencode",
   "description": "Run NuShell scripts interactively with a native-looking terminal beside your editor",
   "version": "0.0.1",
   "publisher": "morishealth",
@@ -28,7 +28,7 @@
     "commands": [
       {
         "command": "nullshell.runScript",
-        "title": "OpenCode: Run in Current Directory"
+        "title": "OpenCode: Run opencode.nu in current directory"
       }
     ]
   },
