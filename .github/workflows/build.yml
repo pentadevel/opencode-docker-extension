@@ -48,7 +48,7 @@ jobs:
 
       - name: Publish to VSCode Marketplace
         if: startsWith(github.ref, 'refs/tags/')
-        run: npx vsce publish --packagePath *.vsix --pat ${{ secrets.VSCE_PAT }}
+        run: npx vsce publish --packagePath opencode-wrapper-${{ matrix.platform }}-${{ matrix.arch }}-0.0.1.vsix --pat ${{ secrets.VSCE_PAT }}
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
