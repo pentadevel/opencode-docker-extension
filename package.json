@@ -3,11 +3,11 @@
   "displayName": "NuShell Interactive Terminal",
   "description": "Run NuShell scripts interactively with a native-looking terminal beside your editor",
   "version": "0.0.1",
-  "publisher": "YOUR_PUBLISHER_NAME",
+  "publisher": "morishealth",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/YOUR_USERNAME/opencode-docker-extension"
+    "url": "https://github.com/pentadevel/opencode-docker-extension"
   },
   "keywords": [
     "nushell",
