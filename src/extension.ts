@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
+import * as fs from 'fs';
 import * as pty from 'node-pty';
 
 let terminalPanel: vscode.WebviewPanel | undefined;
@@ -144,8 +145,29 @@ async function runNuScript(context: vscode.ExtensionContext) {
     }
 
     // Create PTY process (real terminal)
-    // Use 'nu' directly and let the system find it via extended PATH
-    ptyProcess = pty.spawn('nu', [scriptPath], {
+    // Find nu executable in common locations
+    const nuPaths = [
+        '/opt/homebrew/bin/nu',  // Homebrew on Apple Silicon
+        '/usr/local/bin/nu',     // Homebrew on Intel Mac
+        '/usr/bin/nu',           // System binaries
+    ];
+
+    let nuExecutable = 'nu';  // fallback to PATH resolution
+
+    // Check which path exists and use it
+    for (const nuPath of nuPaths) {
+        try {
+            if (fs.existsSync(nuPath)) {
+                nuExecutable = nuPath;
+                console.log('Found nu at:', nuPath);
+                break;
+            }
+        } catch (e) {
+            // Continue checking other paths
+        }
+    }
+
+    ptyProcess = pty.spawn(nuExecutable, [scriptPath], {
         name: 'xterm-color',
         cols: 80,
         rows: 30,

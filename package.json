@@ -2,7 +2,7 @@
   "name": "opencode-wrapper",
   "displayName": "NuShell Interactive for opencode",
   "description": "Run NuShell scripts interactively with a native-looking terminal beside your editor",
-  "version": "0.0.9",
+  "version": "0.0.11",
   "publisher": "morishealth",
   "license": "MIT",
   "repository": {
