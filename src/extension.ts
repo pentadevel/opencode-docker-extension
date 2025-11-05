@@ -1,6 +1,8 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as pty from 'node-pty';
+import * as fs from 'fs';
+import { execSync } from 'child_process';
 
 let terminalPanel: vscode.WebviewPanel | undefined;
 let ptyProcess: pty.IPty | undefined;
@@ -14,6 +16,53 @@ export function activate(context: vscode.ExtensionContext) {
     });
 
     context.subscriptions.push(runCmd);
+}
+
+function findNuBinary(): string | null {
+    // Common locations for nu binary on macOS (Apple Silicon and Intel)
+    const commonPaths = [
+        '/opt/homebrew/bin/nu',  // Homebrew on Apple Silicon
+        '/usr/local/bin/nu',      // Homebrew on Intel
+        '/usr/bin/nu',            // System-wide install
+    ];
+
+    // Check common paths first
+    for (const nuPath of commonPaths) {
+        try {
+            if (fs.existsSync(nuPath)) {
+                return nuPath;
+            }
+        } catch (e) {
+            // Continue to next path
+        }
+    }
+
+    // Try to find nu using 'which' command
+    try {
+        const result = execSync('which nu', { encoding: 'utf8' }).trim();
+        if (result) {
+            return result;
+        }
+    } catch (e) {
+        // which command failed
+    }
+
+    // Try PATH environment variable
+    if (process.env.PATH) {
+        const pathDirs = process.env.PATH.split(':');
+        for (const dir of pathDirs) {
+            const nuPath = path.join(dir, 'nu');
+            try {
+                if (fs.existsSync(nuPath)) {
+                    return nuPath;
+                }
+            } catch (e) {
+                // Continue to next directory
+            }
+        }
+    }
+
+    return null;
 }
 
 async function runNuScript(context: vscode.ExtensionContext) {
@@ -126,8 +175,17 @@ async function runNuScript(context: vscode.ExtensionContext) {
     // Use script's directory as working directory
     const scriptDir = path.dirname(scriptPath);
 
+    // Try to find nu binary in common locations
+    const nuPath = findNuBinary();
+    if (!nuPath) {
+        vscode.window.showErrorMessage(
+            'NuShell (nu) not found. Please install it from https://www.nushell.sh/ or ensure it is in your PATH'
+        );
+        return;
+    }
+
     // Create PTY process (real terminal)
-    ptyProcess = pty.spawn('nu', [scriptPath], {
+    ptyProcess = pty.spawn(nuPath, [scriptPath], {
         name: 'xterm-color',
         cols: 80,
         rows: 30,
