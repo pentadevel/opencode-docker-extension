@@ -184,8 +184,18 @@ async function runNuScript(context: vscode.ExtensionContext) {
         return;
     }
 
+    // Resolve symlinks to get the actual binary path (important for macOS Homebrew)
+    let resolvedNuPath = nuPath;
+    try {
+        resolvedNuPath = fs.realpathSync(nuPath);
+        console.log('Resolved nu path:', resolvedNuPath);
+    } catch (e) {
+        console.warn('Could not resolve symlink for nu binary:', e);
+        // Continue with original path
+    }
+
     // Create PTY process (real terminal)
-    ptyProcess = pty.spawn(nuPath, [scriptPath], {
+    ptyProcess = pty.spawn(resolvedNuPath, [scriptPath], {
         name: 'xterm-color',
         cols: 80,
         rows: 30,
