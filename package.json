@@ -1,0 +1,58 @@
+{
+  "name": "opencode-wrapper",
+  "displayName": "NuShell Interactive Terminal",
+  "description": "Run NuShell scripts interactively with a native-looking terminal beside your editor",
+  "version": "0.0.1",
+  "publisher": "YOUR_PUBLISHER_NAME",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/YOUR_USERNAME/opencode-docker-extension"
+  },
+  "keywords": [
+    "nushell",
+    "nu",
+    "terminal",
+    "shell",
+    "interactive",
+    "pty"
+  ],
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "nullshell.runScript",
+        "title": "OpenCode: Run in Current Directory"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/node": "20.x",
+    "@types/vscode": "^1.85.0",
+    "@typescript-eslint/eslint-plugin": "^6.15.0",
+    "@typescript-eslint/parser": "^6.15.0",
+    "@vscode/vsce": "^3.6.2",
+    "@xterm/addon-fit": "^0.10.0",
+    "@xterm/xterm": "^5.5.0",
+    "electron-rebuild": "^3.2.9",
+    "eslint": "^8.56.0",
+    "typescript": "^5.3.3"
+  },
+  "dependencies": {
+    "node-pty": "^1.1.0-beta39"
+  }
+}
