@@ -17,16 +17,21 @@ export function activate(context: vscode.ExtensionContext) {
 }
 
 async function runNuScript(context: vscode.ExtensionContext) {
-    const workspaceFolders = vscode.workspace.workspaceFolders;
-    if (!workspaceFolders) {
-        vscode.window.showErrorMessage('No workspace folder open');
-        return;
-    }
+    try {
+        console.log('runNuScript called');
+        const workspaceFolders = vscode.workspace.workspaceFolders;
+        if (!workspaceFolders) {
+            vscode.window.showErrorMessage('No workspace folder open');
+            return;
+        }
 
-    const workspacePath = workspaceFolders[0].uri.fsPath;
+        const workspacePath = workspaceFolders[0].uri.fsPath;
+        console.log('Workspace path:', workspacePath);
 
-    // Find all .nu files in workspace
-    const nuFiles = await vscode.workspace.findFiles('**/*.nu', '**/node_modules/**');
+        // Find all .nu files in workspace
+        console.log('Searching for .nu files...');
+        const nuFiles = await vscode.workspace.findFiles('**/*.nu', '**/node_modules/**');
+        console.log('Found .nu files:', nuFiles.length);
 
     let scriptPath: string;
 
@@ -156,6 +161,10 @@ async function runNuScript(context: vscode.ExtensionContext) {
         });
         ptyProcess = undefined;
     });
+    } catch (error) {
+        console.error('Error in runNuScript:', error);
+        vscode.window.showErrorMessage(`Failed to run NuShell script: ${error}`);
+    }
 }
 
 function getTerminalHTML(): string {
