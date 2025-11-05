@@ -1,10 +1,10 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
-import * as pty from 'node-pty';
+import { spawn, ChildProcess } from 'child_process';
 
 let terminalPanel: vscode.WebviewPanel | undefined;
-let ptyProcess: pty.IPty | undefined;
+let childProcess: ChildProcess | undefined;
 
 export function activate(context: vscode.ExtensionContext) {
     console.log('OpenCode wrapper extension is now active');
@@ -96,22 +96,19 @@ async function runNuScript(context: vscode.ExtensionContext) {
         terminalPanel.webview.html = getTerminalHTML();
 
         terminalPanel.onDidDispose(() => {
-            if (ptyProcess) {
-                ptyProcess.kill();
+            if (childProcess) {
+                childProcess.kill();
             }
             terminalPanel = undefined;
-            ptyProcess = undefined;
+            childProcess = undefined;
         });
 
-        // Handle messages from webview (user input and resize)
+        // Handle messages from webview (user input)
         terminalPanel.webview.onDidReceiveMessage(
             message => {
-                if (message.type === 'input' && ptyProcess) {
-                    // Send user input to the PTY
-                    ptyProcess.write(message.text);
-                } else if (message.type === 'resize' && ptyProcess) {
-                    // Resize the PTY
-                    ptyProcess.resize(message.cols, message.rows);
+                if (message.type === 'input' && childProcess && childProcess.stdin) {
+                    // Send user input to the process
+                    childProcess.stdin.write(message.text);
                 }
             },
             undefined,
@@ -119,9 +116,10 @@ async function runNuScript(context: vscode.ExtensionContext) {
         );
     }
 
-    // Start nu process
-    if (ptyProcess) {
-        ptyProcess.kill();
+    // Kill existing process if any
+    if (childProcess) {
+        childProcess.kill();
+        childProcess = undefined;
     }
 
     // Use script's directory as working directory
@@ -129,7 +127,7 @@ async function runNuScript(context: vscode.ExtensionContext) {
 
     // Create environment with extended PATH
     // VSCode marketplace extensions don't always have Homebrew paths in their PATH
-    const env = { ...process.env } as { [key: string]: string };
+    const env = { ...process.env };
     const additionalPaths = [
         '/opt/homebrew/bin',  // Homebrew on Apple Silicon
         '/usr/local/bin',     // Homebrew on Intel Mac
@@ -144,7 +142,6 @@ async function runNuScript(context: vscode.ExtensionContext) {
         console.log('Extended PATH:', env.PATH);
     }
 
-    // Create PTY process (real terminal)
     // Find nu executable in common locations
     const nuPaths = [
         '/opt/homebrew/bin/nu',  // Homebrew on Apple Silicon
@@ -167,14 +164,6 @@ async function runNuScript(context: vscode.ExtensionContext) {
         }
     }
 
-    ptyProcess = pty.spawn(nuExecutable, [scriptPath], {
-        name: 'xterm-color',
-        cols: 80,
-        rows: 30,
-        cwd: scriptDir,
-        env: env
-    });
-
     // Clear previous output and send initial info
     terminalPanel.webview.postMessage({
         type: 'clear'
@@ -185,22 +174,65 @@ async function runNuScript(context: vscode.ExtensionContext) {
         text: `Running: ${scriptPath}\r\nWorking Directory: ${scriptDir}\r\n\r\n`
     });
 
-    // Capture all output from PTY
-    ptyProcess.onData((data: string) => {
-        terminalPanel?.webview.postMessage({
-            type: 'output',
-            text: data
+    // Spawn the process using child_process
+    try {
+        childProcess = spawn(nuExecutable, [scriptPath], {
+            cwd: scriptDir,
+            env: env,
+            shell: false
         });
-    });
 
-    // Handle process exit
-    ptyProcess.onExit((event: { exitCode: number; signal?: number }) => {
-        terminalPanel?.webview.postMessage({
-            type: 'output',
-            text: `\r\n\r\nProcess exited with code: ${event.exitCode}\r\n`
+        console.log('Process spawned with PID:', childProcess.pid);
+
+        // Capture stdout
+        if (childProcess.stdout) {
+            childProcess.stdout.on('data', (data: Buffer) => {
+                const text = data.toString();
+                console.log('stdout:', text);
+                terminalPanel?.webview.postMessage({
+                    type: 'output',
+                    text: text
+                });
+            });
+        }
+
+        // Capture stderr
+        if (childProcess.stderr) {
+            childProcess.stderr.on('data', (data: Buffer) => {
+                const text = data.toString();
+                console.log('stderr:', text);
+                terminalPanel?.webview.postMessage({
+                    type: 'output',
+                    text: text
+                });
+            });
+        }
+
+        // Handle process exit
+        childProcess.on('exit', (code: number | null, signal: string | null) => {
+            console.log(`Process exited with code ${code}, signal ${signal}`);
+            terminalPanel?.webview.postMessage({
+                type: 'output',
+                text: `\r\n\r\nProcess exited with code: ${code}\r\n`
+            });
+            childProcess = undefined;
         });
-        ptyProcess = undefined;
-    });
+
+        // Handle process errors
+        childProcess.on('error', (err: Error) => {
+            console.error('Process error:', err);
+            terminalPanel?.webview.postMessage({
+                type: 'output',
+                text: `\r\n\r\nError: ${err.message}\r\n`
+            });
+            vscode.window.showErrorMessage(`Failed to run script: ${err.message}`);
+        });
+
+    } catch (error) {
+        console.error('Error spawning process:', error);
+        vscode.window.showErrorMessage(`Failed to spawn process: ${error}`);
+    }
+
     } catch (error) {
         console.error('Error in runNuScript:', error);
         vscode.window.showErrorMessage(`Failed to run NuShell script: ${error}`);
@@ -213,7 +245,7 @@ function getTerminalHTML(): string {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NuShell Interactive Terminal</title>
+    <title>NuShell Output</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.css" />
     <style>
         * {
@@ -245,14 +277,15 @@ function getTerminalHTML(): string {
 
         // Create xterm instance
         const term = new Terminal({
-            cursorBlink: true,
+            cursorBlink: false,
             fontSize: 13,
             fontFamily: 'Menlo, Monaco, "Courier New", monospace',
             theme: {
                 background: getComputedStyle(document.body).getPropertyValue('--vscode-terminal-background') || '#1e1e1e',
                 foreground: getComputedStyle(document.body).getPropertyValue('--vscode-terminal-foreground') || '#cccccc'
             },
-            scrollback: 10000
+            scrollback: 10000,
+            disableStdin: false
         });
 
         // Add fit addon
@@ -266,22 +299,7 @@ function getTerminalHTML(): string {
         // Handle window resize
         window.addEventListener('resize', () => {
             fitAddon.fit();
-            // Notify extension about terminal size change
-            vscode.postMessage({
-                type: 'resize',
-                cols: term.cols,
-                rows: term.rows
-            });
         });
-
-        // Send initial terminal size
-        setTimeout(() => {
-            vscode.postMessage({
-                type: 'resize',
-                cols: term.cols,
-                rows: term.rows
-            });
-        }, 100);
 
         // Handle user input from terminal
         term.onData(data => {
@@ -309,8 +327,8 @@ function getTerminalHTML(): string {
 }
 
 export function deactivate() {
-    if (ptyProcess) {
-        ptyProcess.kill();
+    if (childProcess) {
+        childProcess.kill();
     }
     if (terminalPanel) {
         terminalPanel.dispose();
