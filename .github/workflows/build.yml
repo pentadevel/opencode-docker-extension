@@ -40,8 +40,15 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Rebuild node-pty for platform
-        run: npm rebuild node-pty
+      - name: Get VSCode Electron version
+        id: electron
+        run: |
+          ELECTRON_VERSION=$(npx @vscode/vsce ls --yarn 2>&1 | grep -oP "Detected Electron v\K[0-9]+\.[0-9]+\.[0-9]+" || echo "28.2.8")
+          echo "version=$ELECTRON_VERSION" >> $GITHUB_OUTPUT
+        shell: bash
+
+      - name: Rebuild native modules for Electron
+        run: npx electron-rebuild -v ${{ steps.electron.outputs.version }} -m .
 
       - name: Compile TypeScript
         run: npm run compile
